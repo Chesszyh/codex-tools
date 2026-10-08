@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex 会话速度</title>
+<style>
+:root{font-family:Inter,"Noto Sans CJK SC",sans-serif;color:#192433;background:#f4f6f8;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}main{max-width:1380px;margin:auto;padding:38px 32px 48px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:26px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:2px;color:#6b7789;margin:0 0 8px}h1{font-size:30px;letter-spacing:-1px;font-weight:650;margin:0}.live{font-size:13px;display:flex;align-items:center;gap:9px;color:#617087}.dot{width:8px;height:8px;background:#15977e;border-radius:50%}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px}.stat{padding:21px 24px;background:white;border:1px solid #e1e6ed;border-radius:14px}.stat .label{font-size:13px;color:#66768a}.stat .number{font-size:30px;margin-top:9px;letter-spacing:-.8px}.stat .unit{font-size:13px;color:#7d8999;margin-left:7px}
+.panel{background:white;border:1px solid #e1e6ed;border-radius:14px;margin-bottom:20px;overflow:hidden}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:19px 23px;border-bottom:1px solid #edf0f4;flex-wrap:wrap}.controls,.exports{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+select,button,.button{font:inherit;font-size:12px;background:white;border:1px solid #d9e0e8;border-radius:7px;padding:8px 10px;color:#334155;text-decoration:none;cursor:pointer}button:hover,.button:hover{background:#f4f7fa;border-color:#b8c6d6}select{max-width:270px}#chart{padding:18px 18px 0}#chart svg{display:block;width:100%;height:auto;min-height:250px}.legend{display:flex;gap:15px;flex-wrap:wrap;padding:2px 24px 19px;font-size:12px;color:#526174}.legend span{display:inline-flex;align-items:center;gap:7px}.swatch{width:8px;height:8px;border-radius:50%}.note{font-size:12px;color:#7b8798;padding:13px 23px;background:#fafbfd;border-top:1px solid #edf0f4;line-height:1.6}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left}th{font-size:11px;color:#8290a2;letter-spacing:.2px;font-weight:500;background:#fafbfd;padding:13px 22px;white-space:nowrap}td{font-size:13px;padding:16px 22px;border-top:1px solid #edf0f4;white-space:nowrap}.session-title{max-width:330px;overflow:hidden;text-overflow:ellipsis}.model{font-size:11px;color:#7b8798;margin-top:5px}.speed{font-variant-numeric:tabular-nums;font-weight:650;font-size:18px}.status{font-size:11px;display:inline-block;padding:4px 7px;border-radius:5px;background:#edf3fc;color:#4670a9}.status.idle{background:#f0f2f5;color:#8590a0}.status.tool{background:#fff4e7;color:#a77329}.age{font-size:11px;color:#8c97a6;margin-top:5px}.footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:11px;color:#8894a4;line-height:1.6}#save-path{overflow-wrap:anywhere}#error{display:none;color:#a33a36;background:#fff1f0;padding:12px 20px;border-radius:8px;margin-bottom:20px;font-size:13px}#session-errors{color:#8a5c2f;font-size:12px;margin:0 0 20px}#session-errors summary{cursor:pointer;padding:8px 0}#session-errors ul{margin:6px 0;padding-left:20px;line-height:1.7;overflow-wrap:anywhere}#session-errors[hidden]{display:none}.empty{padding:45px;color:#8995a5;text-align:center}.tip{position:fixed;display:none;background:#172232;color:white;font-size:12px;line-height:1.8;border-radius:8px;padding:10px 14px;pointer-events:none;box-shadow:0 8px 20px #0002;z-index:3}
+@media(max-width:700px){main{padding:22px 14px}.stats{gap:8px}.stat{padding:14px}.stat .number{font-size:23px}h1{font-size:24px}header{align-items:flex-start}.toolbar{padding:15px}td,th{padding:13px}#chart{padding:8px}select{max-width:190px}.footer{display:block}.live{max-width:110px;text-align:right}}
+</style>
+</head>
+<body>
+<main>
+<header><div><p class="eyebrow">CODEX / LOCAL TELEMETRY</p><h1>会话输出速度</h1></div><div class="live"><span class="dot" id="live-dot"></span><span id="connection">连接中</span></div></header>
+<div id="error" role="alert"></div>
+<details id="session-errors" hidden><summary id="session-errors-summary"></summary><ul id="session-errors-list"></ul></details>
+<div class="stats">
+<div class="stat"><div class="label">记录会话</div><div class="number" id="session-count">—</div></div>
+<div class="stat"><div class="label">已完成请求</div><div class="number" id="request-count">—</div></div>
+<div class="stat"><div class="label">所选请求平均速度</div><div class="number"><span id="average">—</span><span class="unit">token/s</span></div></div>
+</div>
+<section class="panel">
+<div class="toolbar">
+<div class="controls"><select id="model" aria-label="模型"><option value="">所有模型</option></select><select id="session" aria-label="会话"><option value="">所有会话</option></select><select id="range" aria-label="时间范围"><option value="10">最近 10 分钟</option><option value="30" selected>最近 30 分钟</option><option value="60">最近 1 小时</option><option value="0">全部记录</option></select><select id="metric" aria-label="速度口径"><option value="request_tps">全部输出 token</option><option value="non_reasoning_tps">非推理输出 token</option></select></div>
+<div class="exports"><button id="png">保存 PNG</button><button id="svg">保存 SVG</button><button id="csv">保存 CSV</button><button id="html">保存网页</button></div>
+</div>
+<div id="chart"></div><div id="legend" class="legend"></div>
+<div class="note">每个点对应一次已完成请求。平均速度包含首段等待；全部输出包含推理，非推理输出包含文字和工具调用参数。</div>
+</section>
+<section class="panel table-wrap"><table><thead><tr><th>会话 / 模型</th><th>状态</th><th>最近请求 · token/s</th><th>最近 5 次 · token/s</th><th>60 秒墙钟吞吐 · token/s</th><th>请求数</th></tr></thead><tbody id="sessions"></tbody></table></section>
+<div class="footer"><span id="save-path"></span><span id="updated"></span></div>
+</main><div class="tip" id="tip"></div>
+<script>
+const INITIAL = __INITIAL_STATE__;
+const SAVED = __SAVED__;
+let state = INITIAL;
+const palette = ['#2563eb','#dc6b25','#169b83','#a855b5','#c94768','#64748b','#b49419','#0891b2'];
+const $ = id => document.getElementById(id);
+const number = v => v == null ? '—' : v.toFixed(1);
+const localTime = t => new Intl.DateTimeFormat('zh-CN',{timeZone:state.timezone,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(t*1000));
+const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function selectedRows(){
+ const since = Number($('range').value) ? state.now-Number($('range').value)*60 : -Infinity;
+ return state.requests.filter(r => Date.parse(r.finished_at)/1000>=since && (!$('model').value || r.model===$('model').value) && (!$('session').value || r.thread_id===$('session').value));
+}
+function options(id, items, first){
+ const select=$(id), old=select.value;
+ select.replaceChildren(new Option(first,''),...items.map(([value,label])=>new Option(label,value)));
+ if(items.some(([value])=>value===old)) select.value=old;
+}
+function render(){
+ const rows=selectedRows(), totalSeconds=rows.reduce((n,r)=>n+r.duration_seconds,0);
+ const tokenKey=$('metric').value==='request_tps' ? 'output_tokens' : 'non_reasoning_tokens';
+ $('session-count').textContent=new Set(rows.map(r=>r.thread_id)).size;
+ $('request-count').textContent=rows.length;
+ $('average').textContent=number(totalSeconds ? rows.reduce((n,r)=>n+r[tokenKey],0)/totalSeconds : null);
+ $('save-path').textContent='自动保存至 '+state.output_dir;
+ $('updated').textContent='更新 '+localTime(state.now)+' · '+state.timezone;
+ $('error').style.display='none';
+ $('session-errors').hidden=!state.errors.length;
+ $('session-errors-summary').textContent='会话读取异常 · '+state.errors.length+' 条';
+ $('session-errors-list').replaceChildren(...state.errors.map(message=>{const item=document.createElement('li');item.textContent=message;return item}));
+ const matching=state.sessions.filter(s=>(!$('model').value||s.model===$('model').value)&&(!$('session').value||s.thread_id===$('session').value));
+ $('sessions').innerHTML=matching.length ? matching.map(s=>{
+  const age=s.last_sample_at ? Math.max(0,Math.round(state.now-Date.parse(s.last_sample_at)/1000)) : null;
+  const label=s.status+(s.elapsed_seconds!=null ? ' · '+Math.round(s.elapsed_seconds)+'s' : '');
+  const statusClass=s.status==='空闲'?'idle':s.status==='工具执行'?'tool':'';
+  return `<tr><td><div class="session-title" title="${esc(s.thread_id)}">${esc(s.title)}</div><div class="model">${esc(s.model)} / ${esc(s.effort)}</div></td><td><span class="status ${statusClass}">${esc(label)}</span></td><td><span class="speed">${number(s.last_request_tps)}</span><div class="age">${age!=null?age+' 秒前':'等待请求完成'}</div></td><td class="speed">${number(s.recent_request_tps)}</td><td>${number(s.window_tps)}</td><td>${s.request_count}</td></tr>`;
+ }).join('') : '<tr><td colspan="6" class="empty">等待会话产生模型请求</td></tr>';
+ draw(rows);
+}
+function draw(rows){
+ const width=1200, height=380, left=55,right=1170,top=38,bottom=335,key=$('metric').value;
+ let xmin=Number($('range').value) ? state.now-Number($('range').value)*60 : Math.min(...rows.map(r=>Date.parse(r.finished_at)/1000),state.now-60),xmax=state.now;
+ const ymax=Math.max(10,...rows.map(r=>r[key]))*1.15;
+ const x=t=>left+(t-xmin)/(xmax-xmin)*(right-left), y=v=>bottom-v/ymax*(bottom-top);
+ const tids=[...new Set(rows.map(r=>r.thread_id))],all=[...new Set(state.requests.map(r=>r.thread_id))];
+ const color=tid=>palette[all.indexOf(tid)%palette.length];
+ let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/><g font-family="sans-serif" fill="#758397" font-size="11"><text x="${left}" y="18">${key==='request_tps'?'全部输出':'非推理输出'} · token/s</text>`;
+ for(let i=0;i<=5;i++){
+  const v=ymax*i/5,t=xmin+(xmax-xmin)*i/5;
+  svg+=`<path d="M ${left} ${y(v)} H ${right}" stroke="#e9edf2"/><text x="${left-10}" y="${y(v)+4}" text-anchor="end">${Math.round(v)}</text><text x="${x(t)}" y="${bottom+24}" text-anchor="middle">${localTime(t)}</text>`;
+ }
+ svg+='</g>';
+ for(const tid of tids){
+  const points=rows.filter(r=>r.thread_id===tid);
+  svg+=`<polyline points="${points.map(r=>x(Date.parse(r.finished_at)/1000)+','+y(r[key])).join(' ')}" fill="none" stroke="${color(tid)}" stroke-width="1.7" opacity=".75"/>`;
+  for(const r of points){
+   const idx=rows.indexOf(r);
+   svg+=`<circle data-point="${idx}" cx="${x(Date.parse(r.finished_at)/1000)}" cy="${y(r[key])}" r="3.5" fill="${color(tid)}" stroke="white" stroke-width="1"/>`;
+  }
+ }
+ if(!rows.length)svg+='<text x="600" y="180" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#8995a5">等待首个请求完成</text>';
+ $('chart').innerHTML=svg+'</svg>';
+ $('legend').innerHTML=tids.map(tid=>`<span><i class="swatch" style="background:${color(tid)}"></i>${esc(rows.find(r=>r.thread_id===tid).title)}</span>`).join('');
+ $('chart').querySelectorAll('circle').forEach(circle=>{
+  circle.addEventListener('pointerenter',event=>{
+   const r=rows[Number(circle.dataset.point)];
+   $('tip').innerHTML=`${esc(r.title)}<br>${esc(r.model)} / ${esc(r.effort)}<br>${number(r[key])} token/s · ${number(r.duration_seconds)}s<br>${r.output_tokens} 输出 · ${r.reasoning_tokens} 推理<br>${localTime(Date.parse(r.finished_at)/1000)}`;
+   $('tip').style.display='block';$('tip').style.left=Math.min(event.clientX+12,window.innerWidth-310)+'px';$('tip').style.top=Math.max(10,event.clientY-140)+'px';
+  });circle.addEventListener('pointerleave',()=>{$('tip').style.display='none'});
+ });
+}
+function download(blob,filename){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function svgText(){
+ const source=$('chart').querySelector('svg').cloneNode(true), tids=[...new Set(selectedRows().map(r=>r.thread_id))];
+ const ns='http://www.w3.org/2000/svg';
+ source.setAttribute('height',420+tids.length*27);source.setAttribute('viewBox',`0 0 1200 ${420+tids.length*27}`);
+ const rect=source.querySelector('rect');rect.setAttribute('height','100%');
+ tids.forEach((tid,i)=>{const text=document.createElementNS(ns,'text'),points=selectedRows().filter(r=>r.thread_id===tid),variants=[...new Set(points.map(r=>r.model+' / '+r.effort))];text.setAttribute('x','55');text.setAttribute('y',395+i*27);text.setAttribute('font-family','sans-serif');text.setAttribute('font-size','13');text.setAttribute('fill',palette[[...new Set(state.requests.map(p=>p.thread_id))].indexOf(tid)%palette.length]);text.textContent=points.at(-1).title+' · '+variants.join(', ');source.append(text)});
+ return new XMLSerializer().serializeToString(source);
+}
+function filename(extension){return 'codex-speed-'+new Date(state.now*1000).toISOString().replace(/[:.]/g,'-')+'.'+extension}
+$('svg').onclick=()=>download(new Blob([svgText()],{type:'image/svg+xml'}),filename('svg'));
+$('png').onclick=async()=>{
+ try{
+  const source=svgText(),url=URL.createObjectURL(new Blob([source],{type:'image/svg+xml'})),image=new Image();
+  await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url});
+  const canvas=document.createElement('canvas');canvas.width=image.width*2;canvas.height=image.height*2;canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));download(blob,filename('png'));
+ }catch(error){$('error').textContent='PNG 保存失败，请使用 SVG：'+error;$('error').style.display='block'}
+};
+$('csv').onclick=()=>{
+ const rows=selectedRows(),fields=['thread_id','title','model','effort','started_at','finished_at','duration_seconds','output_tokens','reasoning_tokens','input_tokens','cached_input_tokens','request_tps','non_reasoning_tps'];
+ const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const csv=[fields.join(','),...rows.map(r=>fields.map(k=>cell(r[k])).join(','))].join('\r\n');download(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),filename('csv'));
+};
+$('html').onclick=async()=>{
+ const html=location.protocol==='file:' ? '<!doctype html>'+document.documentElement.outerHTML.replace(/const INITIAL = .*?;\n/, 'const INITIAL = '+JSON.stringify(state).replace(/</g,'\\u003c')+';\n') : await (await fetch('/snapshot.html')).text();
+ download(new Blob([html],{type:'text/html;charset=utf-8'}),filename('html'));
+};
+for(const id of ['range','model','session','metric'])$(id).onchange=render;
+function updateOptions(){options('model',[...new Set([...state.sessions.map(s=>s.model),...state.requests.map(r=>r.model)])].sort().map(m=>[m,m]),'所有模型');options('session',state.sessions.map(s=>[s.thread_id,s.title]),'所有会话')}
+async function poll(){
+ try{const response=await fetch('/api/state');if(!response.ok)throw new Error('HTTP '+response.status);state=await response.json();updateOptions();render();$('connection').textContent='实时 · '+state.interval+'s';$('live-dot').style.background='#15977e'}
+ catch(error){$('connection').textContent='连接中断';$('live-dot').style.background='#dc6b25';$('error').textContent='无法连接监测服务：'+error.message;$('error').style.display='block'}
+ setTimeout(poll,state.interval*1000);
+}
+updateOptions();render();
+if(SAVED || location.protocol==='file:'){$('connection').textContent='已保存快照';$('live-dot').style.background='#8290a2'}else{poll()}
+</script>
+</body>
+</html>

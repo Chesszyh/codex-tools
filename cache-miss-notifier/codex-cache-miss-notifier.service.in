@@ -1,0 +1,11 @@
+[Unit]
+Description=Notify on Codex cache misses and large cache hits
+
+[Service]
+Type=simple
+ExecStart=@EXEC_START@
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

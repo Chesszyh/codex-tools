@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+/hindsight/
+codex-speed-monitor/data/
+codex-daemon-maintenance/data/
