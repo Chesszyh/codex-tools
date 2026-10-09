@@ -44,6 +44,7 @@ codex-cache-miss-notifier-toggle
 ## 行为边界
 
 - 支持本机 ChatGPT Desktop 中的 Codex 任务和本机 Codex CLI。
+- 会话记录以换行符为完整边界；末尾尚未写完的记录（包括启动时已有的半条记录）会保留，等后续写完后再处理，避免漏报或重复通知。
 - 同一会话先出现缓存活动、之后 `cached_input_tokens` 变为 `0` 时，才判定为 cache miss；第一次请求和 compaction 后的第一次请求不通知。
 - `cached_input_tokens` 严格大于该任务 `model_context_window` 的 75% 时发送 cache hit 通知；等于该值时不通知。缺少上下文窗口信息时不发送 cache hit 通知。
 - 不监控普通 ChatGPT 聊天，因为普通聊天不会把逐次上游 token 使用量写入 `~/.codex/sessions`。

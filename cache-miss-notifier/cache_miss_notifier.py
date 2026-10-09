@@ -93,12 +93,28 @@ class CodexSessionState:
 
     def prime(self) -> None:
         stat = self.path.stat()
-        self.offset = stat.st_size
-        if time.time() - stat.st_mtime > PRIME_ACTIVE_SECONDS:
-            return
         with self.path.open("rb") as stream:
-            for line in stream:
+            if time.time() - stat.st_mtime > PRIME_ACTIVE_SECONDS:
+                # Skip old history, but retain an unfinished record for the next read.
+                end = stat.st_size
+                self.offset = 0
+                while end:
+                    start = max(0, end - 8192)
+                    stream.seek(start)
+                    newline = stream.read(end - start).rfind(b"\n")
+                    if newline >= 0:
+                        self.offset = start + newline + 1
+                        break
+                    end = start
+                return
+            while True:
+                start = stream.tell()
+                line = stream.readline()
+                if not line or not line.endswith(b"\n"):
+                    self.offset = start
+                    break
                 self.consume(line.decode("utf-8", errors="replace"))
+                self.offset = stream.tell()
 
     def consume(self, line: str) -> tuple[str, str] | None:
         try:
@@ -228,13 +244,18 @@ class Watcher:
             size = path.stat().st_size
             if size < state.offset:
                 state.offset = 0
-            with path.open(encoding="utf-8") as stream:
+            with path.open("rb") as stream:
                 stream.seek(state.offset)
-                for line in stream:
-                    result = state.consume(line)
+                while True:
+                    start = stream.tell()
+                    line = stream.readline()
+                    if not line or not line.endswith(b"\n"):
+                        state.offset = start
+                        break
+                    result = state.consume(line.decode("utf-8"))
                     if result is not None:
                         self.notify(*result)
-                state.offset = stream.tell()
+                    state.offset = stream.tell()
         except (OSError, UnicodeError) as error:
             if self.verbose:
                 print(f"Could not read {path}: {error}", file=sys.stderr)
